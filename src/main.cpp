@@ -8,7 +8,7 @@
 #include <sstream>
 #include <fstream>
 
-#define PORT 9012
+#define PORT 9002
 
 using boost::asio::ip::tcp;
 
@@ -89,9 +89,11 @@ class session : public std::enable_shared_from_this<session>{
               if(file.is_open()){
                 file.write((char*)&rec , sizeof(record));
                 file.close();
+                read_message();
               }
               else{
                 std::cerr << "Error when trying to open file for sensor" << std::endl;
+                read_message();
               }
             }
             else if(operation == "GET"){
@@ -111,6 +113,9 @@ class session : public std::enable_shared_from_this<session>{
               // Open file for reading
               std::fstream file(sensor_id.c_str() , std::fstream::in | std::fstream::binary);
               if(file.is_open()){
+                response.clear();
+                //response.append("%d" , read_num);
+                response << read_num;
                 for(int i = 1 ; i <= read_num ; ++i){
                   file.seekg(-i*sizeof(record) , file.end);
                   file.read((char*)&rec , sizeof(record));
@@ -119,26 +124,45 @@ class session : public std::enable_shared_from_this<session>{
                   std::cout << "CLIENT REQUESTED INFO" << std::endl;
                   std::cout << "ID : " << rec.id << " TIME : " << time_t_to_string(rec.rec_time) << " DATA : " << rec.data << std::endl;
                   // END DEBUGGING
+
+                  //response.append(std::format(";%s|%d" , time_t_to_string(rec.rec_time) , rec.data));
+                  response << ";" << time_t_to_string(rec.rec_time) << "|" << rec.data;
                 }
                 file.close();
+                //response.append("\r\n");
+                response << "\r\n";
+                str_response.clear();
+                str_response = response.str();
+                write_message(str_response);
               }
               else{
                 std::cerr << "Error when trying to open file for sensor" << std::endl;
+                str_response.clear();
+                str_response = "ERROR|INVALID_SENSOR_ID\r\n";
+                write_message(str_response);
               }
             }
             else{
-              std::cerr << "OPERATION TYPE DOES NOT MATCH \"LOG\" OR \"GET\" OP TYPE\n" << std::endl;
+              std::cerr << "OPERATION TYPE DOES NOT MATCH \"LOG\" OR \"GET\" OP TYPE\n";
+              str_response.clear();
+              str_response = "OPERATION TYPE DOES NOT MATCH \"LOG\" OR \"GET\" OP TYPE\n";
+              write_message(str_response);
             }
-
-            write_message();
-
           }
         }
       );
     };
 
-    void write_message(){
-      read_message();
+    void write_message(std::string& message){
+      auto self(shared_from_this());
+      boost::asio::async_write(socket_, boost::asio::buffer(message),
+        [this, self, message](boost::system::error_code ec , std::size_t /*length*/)
+        {
+          if (!ec)
+          {
+            read_message();
+          }
+        });
     };
 
     tcp::socket socket_;
@@ -154,6 +178,12 @@ class session : public std::enable_shared_from_this<session>{
 
     // GET operation fields
     std::string num_reg;
+
+    // RESPONSE
+    // nao é o melhor jeito mas já que o codespace tá me trollando
+    // nao me deixando usar o <format>, vai isso mesmo pra quebrar o galho
+    std::stringstream response;
+    std::string str_response;
 
     FILE* pfile;
 };
