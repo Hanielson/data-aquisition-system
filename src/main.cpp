@@ -7,8 +7,9 @@
 #include <iomanip>
 #include <sstream>
 #include <fstream>
+#include <mutex>
 
-#define PORT 9002
+#define PORT 9003
 
 using boost::asio::ip::tcp;
 
@@ -156,11 +157,12 @@ class session : public std::enable_shared_from_this<session>{
     void write_message(std::string& message){
       auto self(shared_from_this());
       boost::asio::async_write(socket_, boost::asio::buffer(message),
-        [this, self, message](boost::system::error_code ec , std::size_t /*length*/)
+        [this, self, message](boost::system::error_code ec , std::size_t length)
         {
           if (!ec)
           {
-            read_message();
+            std::cout << "MESSAGE SENT SUCCESSFULLY\n"; 
+            //read_message();
           }
         });
     };
