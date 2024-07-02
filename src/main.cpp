@@ -8,6 +8,8 @@
 #include <sstream>
 #include <fstream>
 #include <mutex>
+#include <execinfo.h>
+#include <stdio.h>
 
 #define PORT 9003
 
@@ -33,6 +35,10 @@ struct record{
   double data;
 };
 
+// HAD TO PUT record VARIABLE OUTSIDE OF FUNCTIONS SCOPE
+// WHEN TRYING TO DECONSTRUCT THE VARIABLE, "free() invalid pointer" HAPPENS
+record rec;
+
 class session : public std::enable_shared_from_this<session>{
   public:
     session(tcp::socket socket) : socket_(std::move(socket)){};
@@ -43,6 +49,7 @@ class session : public std::enable_shared_from_this<session>{
 
   private:
     void read_message(){
+      try{
       auto self(shared_from_this());
       boost::asio::async_read_until(socket_, buffer_, "\r\n",
         [this, self](boost::system::error_code ec, std::size_t length)
@@ -73,7 +80,7 @@ class session : public std::enable_shared_from_this<session>{
               // END DEBUGGING
 
               // create Record structure for storing at file
-              record rec;
+              //record rec;
               rec.data = stod(sensor_data);
               rec.id = sensor_id;
               rec.rec_time = string_to_time_t(time_info);
@@ -108,8 +115,6 @@ class session : public std::enable_shared_from_this<session>{
 
               int read_num = atoi(num_reg.c_str());
 
-              // create Record structure for reading from file
-              record rec;
 
               // Open file for reading
               std::fstream file(sensor_id.c_str() , std::fstream::in | std::fstream::binary);
@@ -118,10 +123,14 @@ class session : public std::enable_shared_from_this<session>{
                 //response.append("%d" , read_num);
                 response << read_num;
                 for(int i = 1 ; i <= read_num ; ++i){
+                  // create Record structure for reading from file
+                  //record rec;
+                  //std::cout << "REC ADDRESS BEFORE : " << &rec <<std::endl;
                   file.seekg(-i*sizeof(record) , file.end);
                   file.read((char*)&rec , sizeof(record));
 
                   // DEBUGGING
+                  //std::cout << "REC ADDRESS AFTER : " << &rec <<std::endl;
                   std::cout << "CLIENT REQUESTED INFO" << std::endl;
                   std::cout << "ID : " << rec.id << " TIME : " << time_t_to_string(rec.rec_time) << " DATA : " << rec.data << std::endl;
                   // END DEBUGGING
@@ -152,9 +161,31 @@ class session : public std::enable_shared_from_this<session>{
           }
         }
       );
+      }
+      catch(std::exception& e){
+        std::cerr << e.what() << std::endl;
+    
+        // CÓDIGO COPIADO PARA GERAR BACK TRACE
+        void *array[10];
+        char **strings;
+        int size, i;
+
+        size = backtrace (array, 10);
+        strings = backtrace_symbols (array, size);
+        if (strings != NULL)
+        {
+          printf ("Obtained %d stack frames.\n", size);
+          for (i = 0; i < size; i++)
+          printf ("%s\n", strings[i]);
+        }
+
+        free (strings);
+        // FIM DO CÓDIGO COPIADO
+      }
     };
 
     void write_message(std::string& message){
+      try{
       auto self(shared_from_this());
       boost::asio::async_write(socket_, boost::asio::buffer(message),
         [this, self, message](boost::system::error_code ec , std::size_t length)
@@ -165,6 +196,27 @@ class session : public std::enable_shared_from_this<session>{
             //read_message();
           }
         });
+      }
+      catch(std::exception& e){
+        std::cerr << e.what() << std::endl;
+    
+        // CÓDIGO COPIADO PARA GERAR BACK TRACE
+        void *array[10];
+        char **strings;
+        int size, i;
+
+        size = backtrace (array, 10);
+        strings = backtrace_symbols (array, size);
+        if (strings != NULL)
+        {
+          printf ("Obtained %d stack frames.\n", size);
+          for (i = 0; i < size; i++)
+          printf ("%s\n", strings[i]);
+        }
+
+        free (strings);
+        // FIM DO CÓDIGO COPIADO
+      }
     };
 
     tcp::socket socket_;
@@ -221,8 +273,26 @@ int main(int argc, char* argv[])
     io_context.run();
   }
   catch(std::exception& e){
+    
     std::cerr << e.what() << std::endl;
+    
+    // CÓDIGO COPIADO PARA GERAR BACK TRACE
+    void *array[10];
+    char **strings;
+    int size, i;
+
+    size = backtrace (array, 10);
+    strings = backtrace_symbols (array, size);
+    if (strings != NULL)
+    {
+      printf ("Obtained %d stack frames.\n", size);
+      for (i = 0; i < size; i++)
+      printf ("%s\n", strings[i]);
+    }
+
+    free (strings);
+    // FIM DO CÓDIGO COPIADO
+    
   }
-  
   return 0;
 }
