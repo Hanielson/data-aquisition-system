@@ -11,7 +11,7 @@
 #include <execinfo.h>
 #include <stdio.h>
 
-#define PORT 9000
+#define PORT 9002
 
 using boost::asio::ip::tcp;
 
@@ -110,7 +110,7 @@ class session : public std::enable_shared_from_this<session>{
               num_reg = message.substr( begin , (message.find('\r' , begin) - begin));
 
               // DEBUGGING
-              std::cout << "NUM REG : " << num_reg << std::endl;
+              std::cout << " NUM REG : " << num_reg << std::endl;
               // END DEBUGGING
 
               int read_num = atoi(num_reg.c_str());
@@ -127,16 +127,30 @@ class session : public std::enable_shared_from_this<session>{
                   //record rec;
                   //std::cout << "REC ADDRESS BEFORE : " << &rec <<std::endl;
                   file.seekg(-i*sizeof(record) , file.end);
-                  file.read((char*)&rec , sizeof(record));
+                  if(file.tellg() == file.beg){
+                    file.read((char*)&rec , sizeof(record));
+                    // DEBUGGING
+                    //std::cout << "REC ADDRESS AFTER : " << &rec <<std::endl;
+                    std::cout << "CLIENT REQUESTED INFO" << std::endl;
+                    std::cout << "ID : " << rec.id << " TIME : " << time_t_to_string(rec.rec_time) << " DATA : " << rec.data << std::endl;
+                    // END DEBUGGING
+                    //response.append(std::format(";%s|%d" , time_t_to_string(rec.rec_time) , rec.data));
+                    response << ";" << time_t_to_string(rec.rec_time) << "|" << rec.data;
+                    response << std::endl << "NO MORE REGISTERS TO BE READ";
+                    break;
+                  }
+                  else{
+                    file.read((char*)&rec , sizeof(record));
 
-                  // DEBUGGING
-                  //std::cout << "REC ADDRESS AFTER : " << &rec <<std::endl;
-                  std::cout << "CLIENT REQUESTED INFO" << std::endl;
-                  std::cout << "ID : " << rec.id << " TIME : " << time_t_to_string(rec.rec_time) << " DATA : " << rec.data << std::endl;
-                  // END DEBUGGING
+                    // DEBUGGING
+                    //std::cout << "REC ADDRESS AFTER : " << &rec <<std::endl;
+                    std::cout << "CLIENT REQUESTED INFO" << std::endl;
+                    std::cout << "ID : " << rec.id << " TIME : " << time_t_to_string(rec.rec_time) << " DATA : " << rec.data << std::endl;
+                    // END DEBUGGING
 
-                  //response.append(std::format(";%s|%d" , time_t_to_string(rec.rec_time) , rec.data));
-                  response << ";" << time_t_to_string(rec.rec_time) << "|" << rec.data;
+                    //response.append(std::format(";%s|%d" , time_t_to_string(rec.rec_time) , rec.data));
+                    response << ";" << time_t_to_string(rec.rec_time) << "|" << rec.data;
+                  }
                 }
                 file.close();
                 //response.append("\r\n");
